@@ -26,7 +26,7 @@ class UnhealthyTarget:
     health: str
 
 
-# shared state read by /summary
+# shared state read by API endpoints — mutated in place to avoid import-reference issues
 unhealthy_targets: list[UnhealthyTarget] = []
 
 
@@ -112,4 +112,5 @@ async def collect_all() -> None:
             _known_unhealthy[pod.name] = current_unhealthy
 
     instances_reachable.set(reachable)
-    unhealthy_targets = all_unhealthy
+    unhealthy_targets.clear()
+    unhealthy_targets.extend(all_unhealthy)
