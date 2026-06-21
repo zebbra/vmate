@@ -100,6 +100,8 @@ async def summary() -> dict:
         "label_selector": settings.label_selector,
         "poll_interval": settings.poll_interval,
         "configured_pods": [p.name for p in pods],
+        "ignore_info_jobs": settings.ignore_info_jobs,
+        "ignore_health_jobs": settings.ignore_health_jobs,
     }
 
 

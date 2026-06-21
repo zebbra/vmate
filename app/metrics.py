@@ -1,4 +1,4 @@
-from prometheus_client import Gauge, Info
+from prometheus_client import Gauge
 
 instances_configured = Gauge(
     "vmagent_instances_configured",
@@ -16,8 +16,14 @@ targets_total = Gauge(
     ["pod", "state"],
 )
 
+job_targets_total = Gauge(
+    "vmagent_job_targets_total",
+    "Number of scrape targets per job and state (fleet-wide, excludes ignore_health_jobs)",
+    ["job", "state"],
+)
+
 unhealthy_target_info = Gauge(
     "vmagent_unhealthy_target_info",
-    "Unhealthy scrape targets (value=1 while unhealthy, see /summary for error detail)",
+    "Unhealthy scrape targets (value=1 while unhealthy, see /unhealthy for error detail)",
     ["pod", "scrape_pool", "job", "instance"],
 )

@@ -9,6 +9,7 @@ from .discovery import VmagentPod, discover_pods
 from .metrics import (
     instances_configured,
     instances_reachable,
+    job_targets_total,
     targets_total,
     unhealthy_target_info,
 )
@@ -29,6 +30,9 @@ class UnhealthyTarget:
 # shared state read by API endpoints — mutated in place to avoid import-reference issues
 unhealthy_targets: list[UnhealthyTarget] = []
 
+_known_unhealthy: dict[str, set[tuple]] = defaultdict(set)
+_known_job_states: set[tuple] = set()
+
 
 async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod) -> dict | None:
     try:
@@ -45,17 +49,13 @@ def _clear_pod_metrics(pod_name: str) -> None:
         targets_total.labels(pod=pod_name, state=state).set(0)
 
 
-_known_unhealthy: dict[str, set[tuple]] = defaultdict(set)
-
-
 async def collect_all() -> None:
-    global unhealthy_targets
-
     pods = discover_pods()
     instances_configured.set(len(pods))
 
     reachable = 0
     all_unhealthy: list[UnhealthyTarget] = []
+    job_counts: dict[tuple[str, str], int] = defaultdict(int)  # (job, state) -> count
 
     async with httpx.AsyncClient() as client:
         for pod in pods:
@@ -67,19 +67,23 @@ async def collect_all() -> None:
             reachable += 1
             active = data.get("data", {}).get("activeTargets", [])
 
-            counts: dict[str, int] = defaultdict(int)
+            pod_counts: dict[str, int] = defaultdict(int)
             current_unhealthy: set[tuple] = set()
 
             for t in active:
                 health = t.get("health", "unknown")
-                counts[health] += 1
+                labels_map = t.get("labels", {})
+                job = labels_map.get("job", "")
 
-                if health != "up":
-                    labels_map = t.get("labels", {})
+                if job not in settings.ignore_health_jobs:
+                    pod_counts[health] += 1
+                    job_counts[(job, health)] += 1
+
+                if health != "up" and job not in settings.ignore_info_jobs:
                     key = (
                         pod.name,
                         t.get("scrapePool", ""),
-                        labels_map.get("job", ""),
+                        job,
                         labels_map.get("instance", ""),
                     )
                     current_unhealthy.add(key)
@@ -99,7 +103,7 @@ async def collect_all() -> None:
                     ))
 
             for state in ("up", "down", "unknown"):
-                targets_total.labels(pod=pod.name, state=state).set(counts[state])
+                targets_total.labels(pod=pod.name, state=state).set(pod_counts[state])
 
             for stale in _known_unhealthy[pod.name] - current_unhealthy:
                 unhealthy_target_info.labels(
@@ -110,6 +114,16 @@ async def collect_all() -> None:
                 ).set(0)
 
             _known_unhealthy[pod.name] = current_unhealthy
+
+    # update job_targets_total, zero out stale job/state combos
+    global _known_job_states
+    current_job_states: set[tuple] = set()
+    for (job, state), count in job_counts.items():
+        job_targets_total.labels(job=job, state=state).set(count)
+        current_job_states.add((job, state))
+    for stale in _known_job_states - current_job_states:
+        job_targets_total.labels(job=stale[0], state=stale[1]).set(0)
+    _known_job_states = current_job_states
 
     instances_reachable.set(reachable)
     unhealthy_targets.clear()
