@@ -42,16 +42,17 @@ async def _poll_loop() -> None:
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
     return HTMLResponse("""
-<html><head><title>vmagent-target-exporter</title></head>
+<html><head><title>vmate</title></head>
 <body>
-<h2>vmagent-target-exporter</h2>
+<h2>vmate — Victoria Metrics Agent Target Exporter</h2>
 <ul>
   <li><a href="/unhealthy">/unhealthy</a> — all unhealthy targets across all pods</li>
+  <li><a href="/pod/{pod}/unhealthy">/pod/{pod}/unhealthy</a> — unhealthy targets for a specific pod</li>
+  <li><a href="/job/{job}/unhealthy">/job/{job}/unhealthy</a> — unhealthy targets for a specific job</li>
   <li><a href="/summary">/summary</a> — discovered pods and config</li>
   <li><a href="/metrics">/metrics</a> — Prometheus metrics</li>
   <li><a href="/healthz">/healthz</a> — health check</li>
 </ul>
-<p><em>Per-pod: /{pod}/unhealthy</em></p>
 </body></html>
 """)
 
@@ -64,15 +65,28 @@ async def all_unhealthy() -> dict:
     }
 
 
-@app.get("/{pod}/unhealthy")
+@app.get("/pod/{pod}/unhealthy")
 async def pod_unhealthy(pod: str) -> dict:
+    pods = discover_pods()
+    if pod not in {p.name for p in pods}:
+        raise HTTPException(status_code=404, detail=f"pod {pod!r} not found")
     targets = [t for t in unhealthy_targets if t.pod == pod]
-    if not targets and pod not in {t.pod for t in unhealthy_targets}:
-        pods = discover_pods()
-        if pod not in {p.name for p in pods}:
-            raise HTTPException(status_code=404, detail=f"pod {pod!r} not found")
     return {
         "pod": pod,
+        "count": len(targets),
+        "targets": [_target_dict(t) for t in targets],
+    }
+
+
+@app.get("/job/{job}/unhealthy")
+async def job_unhealthy(job: str) -> dict:
+    targets = [t for t in unhealthy_targets if t.job == job]
+    if not targets:
+        all_jobs = {t.job for t in unhealthy_targets}
+        if job not in all_jobs:
+            raise HTTPException(status_code=404, detail=f"job {job!r} not found or has no unhealthy targets")
+    return {
+        "job": job,
         "count": len(targets),
         "targets": [_target_dict(t) for t in targets],
     }
