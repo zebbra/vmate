@@ -1,5 +1,15 @@
-from pydantic import field_validator
-from pydantic_settings import BaseSettings
+from pydantic.fields import FieldInfo
+from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource
+from typing import Any, Tuple, Type
+
+_CSV_FIELDS = {"ignore_info_jobs", "ignore_health_jobs"}
+
+
+class _CsvEnvSource(EnvSettingsSource):
+    def prepare_field_value(self, field_name: str, field: FieldInfo, value: Any, value_is_complex: bool) -> Any:
+        if field_name in _CSV_FIELDS and isinstance(value, str):
+            return [j.strip() for j in value.split(",") if j.strip()]
+        return super().prepare_field_value(field_name, field, value, value_is_complex)
 
 
 class Settings(BaseSettings):
@@ -14,12 +24,16 @@ class Settings(BaseSettings):
     # comma-separated job names excluded from all target count metrics
     ignore_health_jobs: list[str] = []
 
-    @field_validator("ignore_info_jobs", "ignore_health_jobs", mode="before")
     @classmethod
-    def _parse_csv(cls, v: object) -> list[str]:
-        if isinstance(v, str):
-            return [j.strip() for j in v.split(",") if j.strip()]
-        return v  # type: ignore[return-value]
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> Tuple[PydanticBaseSettingsSource, ...]:
+        return (init_settings, _CsvEnvSource(settings_cls), dotenv_settings, file_secret_settings)
 
     class Config:
         env_prefix = "VMTE_"
