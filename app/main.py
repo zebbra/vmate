@@ -8,7 +8,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from .collector import collect_all, unhealthy_targets
 from .config import settings
 from .discovery import discover_pods, load_k8s_config
-from .errors import prettify
+from .errors import parse_error
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -114,11 +114,15 @@ async def healthz() -> dict:
 
 
 def _target_dict(t, raw: bool = False) -> dict:
-    return {
+    base = {
         "pod": t.pod,
         "scrape_pool": t.scrape_pool,
         "job": t.job,
         "instance": t.instance,
         "health": t.health,
-        "error": t.error if raw else prettify(t.error),
     }
+    if raw:
+        base["error"] = t.error
+    else:
+        base.update(parse_error(t.error))
+    return base
