@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="vmagent-target-exporter")
+app = FastAPI(title="vmate")
 
 
 @app.on_event("startup")
