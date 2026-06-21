@@ -10,6 +10,7 @@ from .config import settings
 from .discovery import discover_pods, load_k8s_config
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="vmagent-target-exporter")
@@ -18,6 +19,14 @@ app = FastAPI(title="vmagent-target-exporter")
 @app.on_event("startup")
 async def startup() -> None:
     load_k8s_config()
+    pods = discover_pods()
+    logger.info(
+        "starting: label_selector=%r namespace=%r discovered %d pod(s): %s",
+        settings.label_selector,
+        settings.namespace,
+        len(pods),
+        [p.name for p in pods],
+    )
     asyncio.create_task(_poll_loop())
 
 
