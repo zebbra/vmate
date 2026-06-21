@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 
 import httpx
 
@@ -13,6 +14,20 @@ from .metrics import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class UnhealthyTarget:
+    pod: str
+    scrape_pool: str
+    job: str
+    instance: str
+    error: str
+    health: str
+
+
+# shared state read by /summary
+unhealthy_targets: list[UnhealthyTarget] = []
 
 
 async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod) -> dict | None:
@@ -30,15 +45,18 @@ def _clear_pod_metrics(pod_name: str) -> None:
         targets_total.labels(pod=pod_name, state=state).set(0)
 
 
-# track known unhealthy label sets so we can zero them when they recover
 _known_unhealthy: dict[str, set[tuple]] = defaultdict(set)
 
 
 async def collect_all() -> None:
+    global unhealthy_targets
+
     pods = discover_pods()
     instances_configured.set(len(pods))
 
     reachable = 0
+    all_unhealthy: list[UnhealthyTarget] = []
+
     async with httpx.AsyncClient() as client:
         for pod in pods:
             data = await poll_pod(client, pod)
@@ -63,7 +81,6 @@ async def collect_all() -> None:
                         t.get("scrapePool", ""),
                         labels_map.get("job", ""),
                         labels_map.get("instance", ""),
-                        t.get("lastError", ""),
                     )
                     current_unhealthy.add(key)
                     unhealthy_target_info.labels(
@@ -71,22 +88,28 @@ async def collect_all() -> None:
                         scrape_pool=key[1],
                         job=key[2],
                         instance=key[3],
-                        error=key[4],
                     ).set(1)
+                    all_unhealthy.append(UnhealthyTarget(
+                        pod=key[0],
+                        scrape_pool=key[1],
+                        job=key[2],
+                        instance=key[3],
+                        error=t.get("lastError", ""),
+                        health=health,
+                    ))
 
             for state in ("up", "down", "unknown"):
                 targets_total.labels(pod=pod.name, state=state).set(counts[state])
 
-            # zero out targets that recovered since last poll
             for stale in _known_unhealthy[pod.name] - current_unhealthy:
                 unhealthy_target_info.labels(
                     pod=stale[0],
                     scrape_pool=stale[1],
                     job=stale[2],
                     instance=stale[3],
-                    error=stale[4],
                 ).set(0)
 
             _known_unhealthy[pod.name] = current_unhealthy
 
     instances_reachable.set(reachable)
+    unhealthy_targets = all_unhealthy

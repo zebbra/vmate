@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from .collector import collect_all
+from .collector import collect_all, unhealthy_targets
 from .config import settings
 from .discovery import discover_pods, load_k8s_config
 
@@ -42,6 +42,17 @@ async def summary() -> dict:
         "configured_pods": [p.name for p in pods],
         "label_selector": settings.label_selector,
         "namespace": settings.namespace,
+        "unhealthy_targets": [
+            {
+                "pod": t.pod,
+                "scrape_pool": t.scrape_pool,
+                "job": t.job,
+                "instance": t.instance,
+                "health": t.health,
+                "error": t.error,
+            }
+            for t in unhealthy_targets
+        ],
     }
 
 

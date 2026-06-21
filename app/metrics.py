@@ -18,6 +18,6 @@ targets_total = Gauge(
 
 unhealthy_target_info = Gauge(
     "vmagent_unhealthy_target_info",
-    "Unhealthy scrape targets with error detail (value=1 while unhealthy)",
-    ["pod", "scrape_pool", "job", "instance", "error"],
+    "Unhealthy scrape targets (value=1 while unhealthy, see /summary for error detail)",
+    ["pod", "scrape_pool", "job", "instance"],
 )
