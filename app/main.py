@@ -8,6 +8,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from .collector import collect_all, unhealthy_targets
 from .config import settings
 from .discovery import discover_pods, load_k8s_config
+from .errors import prettify
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
@@ -58,15 +59,15 @@ async def index() -> HTMLResponse:
 
 
 @app.get("/unhealthy")
-async def all_unhealthy() -> dict:
+async def all_unhealthy(raw: bool = False) -> dict:
     return {
         "count": len(unhealthy_targets),
-        "targets": [_target_dict(t) for t in unhealthy_targets],
+        "targets": [_target_dict(t, raw) for t in unhealthy_targets],
     }
 
 
 @app.get("/pod/{pod}/unhealthy")
-async def pod_unhealthy(pod: str) -> dict:
+async def pod_unhealthy(pod: str, raw: bool = False) -> dict:
     pods = discover_pods()
     if pod not in {p.name for p in pods}:
         raise HTTPException(status_code=404, detail=f"pod {pod!r} not found")
@@ -74,21 +75,20 @@ async def pod_unhealthy(pod: str) -> dict:
     return {
         "pod": pod,
         "count": len(targets),
-        "targets": [_target_dict(t) for t in targets],
+        "targets": [_target_dict(t, raw) for t in targets],
     }
 
 
 @app.get("/job/{job}/unhealthy")
-async def job_unhealthy(job: str) -> dict:
+async def job_unhealthy(job: str, raw: bool = False) -> dict:
     targets = [t for t in unhealthy_targets if t.job == job]
     if not targets:
-        all_jobs = {t.job for t in unhealthy_targets}
-        if job not in all_jobs:
+        if job not in {t.job for t in unhealthy_targets}:
             raise HTTPException(status_code=404, detail=f"job {job!r} not found or has no unhealthy targets")
     return {
         "job": job,
         "count": len(targets),
-        "targets": [_target_dict(t) for t in targets],
+        "targets": [_target_dict(t, raw) for t in targets],
     }
 
 
@@ -113,12 +113,12 @@ async def healthz() -> dict:
     return {"status": "ok"}
 
 
-def _target_dict(t) -> dict:
+def _target_dict(t, raw: bool = False) -> dict:
     return {
         "pod": t.pod,
         "scrape_pool": t.scrape_pool,
         "job": t.job,
         "instance": t.instance,
         "health": t.health,
-        "error": t.error,
+        "error": t.error if raw else prettify(t.error),
     }
