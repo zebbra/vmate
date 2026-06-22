@@ -50,9 +50,13 @@ async def index() -> HTMLResponse:
   <li><a href="/unhealthy">/unhealthy</a> — all unhealthy targets across all pods</li>
   <li><a href="/pod/{pod}/unhealthy">/pod/{pod}/unhealthy</a> — unhealthy targets for a specific pod</li>
   <li><a href="/job/{job}/unhealthy">/job/{job}/unhealthy</a> — unhealthy targets for a specific job</li>
-  <li><a href="/summary">/summary</a> — discovered pods and config</li>
+  <li><a href="/summary">/summary</a> — discovered pods, config and active blacklists</li>
   <li><a href="/metrics">/metrics</a> — Prometheus metrics</li>
   <li><a href="/healthz">/healthz</a> — health check</li>
+</ul>
+<h4>Query flags</h4>
+<ul>
+  <li><code>?raw=true</code> — on any <code>/unhealthy</code> endpoint: return the original unparsed error string instead of the structured <code>error</code> / <code>error_code</code> / <code>target_url</code> fields</li>
 </ul>
 </body></html>
 """)
