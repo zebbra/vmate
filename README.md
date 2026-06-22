@@ -25,7 +25,7 @@ vmate solves this by polling every vmagent pod's `/api/v1/targets` endpoint from
 | `/unhealthy?raw=true` | Same but with unparsed error strings |
 | `/pod/{pod}/unhealthy` | Unhealthy targets for a specific vmagent pod |
 | `/job/{job}/unhealthy` | Unhealthy targets for a specific scrape job |
-| `/summary` | Discovered pods, config, and active blacklists |
+| `/config` | Discovered pods, config, and active blacklists |
 | `/healthz` | Health check |
 
 ## Metrics
