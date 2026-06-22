@@ -79,20 +79,13 @@ async def collect_all() -> None:
                     pod_counts[health] += 1
                     job_counts[(job, health)] += 1
 
-                if health != "up" and job not in settings.ignore_info_jobs:
+                if health != "up":
                     key = (
                         pod.name,
                         t.get("scrapePool", ""),
                         job,
                         labels_map.get("instance", ""),
                     )
-                    current_unhealthy.add(key)
-                    unhealthy_target_info.labels(
-                        pod=key[0],
-                        scrape_pool=key[1],
-                        job=key[2],
-                        instance=key[3],
-                    ).set(1)
                     all_unhealthy.append(UnhealthyTarget(
                         pod=key[0],
                         scrape_pool=key[1],
@@ -101,6 +94,14 @@ async def collect_all() -> None:
                         error=t.get("lastError", ""),
                         health=health,
                     ))
+                    if job not in settings.ignore_info_jobs:
+                        current_unhealthy.add(key)
+                        unhealthy_target_info.labels(
+                            pod=key[0],
+                            scrape_pool=key[1],
+                            job=key[2],
+                            instance=key[3],
+                        ).set(1)
 
             for state in ("up", "down", "unknown"):
                 targets_total.labels(pod=pod.name, state=state).set(pod_counts[state])

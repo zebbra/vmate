@@ -50,7 +50,8 @@ async def index() -> HTMLResponse:
   <li><a href="/unhealthy">/unhealthy</a> — all unhealthy targets across all pods</li>
   <li><a href="/pod/{pod}/unhealthy">/pod/{pod}/unhealthy</a> — unhealthy targets for a specific pod</li>
   <li><a href="/job/{job}/unhealthy">/job/{job}/unhealthy</a> — unhealthy targets for a specific job</li>
-  <li><a href="/config">/config</a> — discovered pods, config and active blacklists</li>
+  <li><a href="/summary">/summary</a> — runtime state: discovered pods, unhealthy count and jobs</li>
+  <li><a href="/config">/config</a> — static settings: label selector, intervals, blacklists</li>
   <li><a href="/metrics">/metrics</a> — Prometheus metrics</li>
   <li><a href="/healthz">/healthz</a> — health check</li>
 </ul>
@@ -106,6 +107,16 @@ async def config() -> dict:
         "vmagent_timeout": settings.vmagent_timeout,
         "ignore_info_jobs": settings.ignore_info_jobs,
         "ignore_health_jobs": settings.ignore_health_jobs,
+    }
+
+
+@app.get("/summary")
+async def summary() -> dict:
+    pods = discover_pods()
+    return {
+        "discovered_pods": [p.name for p in pods],
+        "unhealthy_count": len(unhealthy_targets),
+        "unhealthy_jobs": sorted({t.job for t in unhealthy_targets}),
     }
 
 
