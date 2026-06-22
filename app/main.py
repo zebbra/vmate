@@ -98,12 +98,12 @@ async def job_unhealthy(job: str, raw: bool = False) -> dict:
 
 @app.get("/config")
 async def config() -> dict:
-    pods = discover_pods()
     return {
         "namespace": settings.namespace,
         "label_selector": settings.label_selector,
+        "vmagent_port": settings.vmagent_port,
         "poll_interval": settings.poll_interval,
-        "configured_pods": [p.name for p in pods],
+        "vmagent_timeout": settings.vmagent_timeout,
         "ignore_info_jobs": settings.ignore_info_jobs,
         "ignore_health_jobs": settings.ignore_health_jobs,
     }
