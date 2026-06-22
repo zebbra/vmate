@@ -50,7 +50,7 @@ async def index() -> HTMLResponse:
   <li><a href="/unhealthy">/unhealthy</a> — all unhealthy targets across all pods</li>
   <li><a href="/pod/{pod}/unhealthy">/pod/{pod}/unhealthy</a> — unhealthy targets for a specific pod</li>
   <li><a href="/job/{job}/unhealthy">/job/{job}/unhealthy</a> — unhealthy targets for a specific job</li>
-  <li><a href="/summary">/summary</a> — discovered pods, config and active blacklists</li>
+  <li><a href="/config">/config</a> — discovered pods, config and active blacklists</li>
   <li><a href="/metrics">/metrics</a> — Prometheus metrics</li>
   <li><a href="/healthz">/healthz</a> — health check</li>
 </ul>
@@ -96,8 +96,8 @@ async def job_unhealthy(job: str, raw: bool = False) -> dict:
     }
 
 
-@app.get("/summary")
-async def summary() -> dict:
+@app.get("/config")
+async def config() -> dict:
     pods = discover_pods()
     return {
         "namespace": settings.namespace,
