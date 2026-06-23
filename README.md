@@ -14,13 +14,11 @@ flowchart LR
         subgraph agents["vmagent pods"]
             va1["vmagent-0"]
             va2["vmagent-1"]
-            va3["vmagent-2"]
-            va4["vmagent-n"]
+            va3["vmagent-n"]
         end
         vmate -->|"poll\n/api/v1/targets"| va1
         vmate -->|"poll\n /api/v1/targets"| va2
         vmate -->|"poll\n /api/v1/targets"| va3
-        vmate -->|"poll\n /api/v1/targets"| va4
     end
 
     grafana -->|"VM Datasource"| vm

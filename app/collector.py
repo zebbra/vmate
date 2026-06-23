@@ -86,14 +86,16 @@ async def collect_all() -> None:
                         job,
                         labels_map.get("instance", ""),
                     )
-                    all_unhealthy.append(UnhealthyTarget(
-                        pod=key[0],
-                        scrape_pool=key[1],
-                        job=key[2],
-                        instance=key[3],
-                        error=t.get("lastError", ""),
-                        health=health,
-                    ))
+                    all_unhealthy.append(
+                        UnhealthyTarget(
+                            pod=key[0],
+                            scrape_pool=key[1],
+                            job=key[2],
+                            instance=key[3],
+                            error=t.get("lastError", ""),
+                            health=health,
+                        )
+                    )
                     if job not in settings.ignore_info_jobs:
                         current_unhealthy.add(key)
                         unhealthy_target_info.labels(

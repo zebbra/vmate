@@ -44,11 +44,13 @@ def discover_pods() -> list[VmagentPod]:
         pod_ip = pod.status.pod_ip
         if phase != "Running" or not pod_ip:
             continue
-        result.append(VmagentPod(
-            name=pod.metadata.name,
-            pod_ip=pod_ip,
-            node=pod.spec.node_name or "",
-        ))
+        result.append(
+            VmagentPod(
+                name=pod.metadata.name,
+                pod_ip=pod_ip,
+                node=pod.spec.node_name or "",
+            )
+        )
 
     logger.debug("discovered %d vmagent pods", len(result))
     return result

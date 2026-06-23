@@ -89,7 +89,10 @@ async def job_unhealthy(job: str, raw: bool = False) -> dict:
     targets = [t for t in unhealthy_targets if t.job == job]
     if not targets:
         if job not in {t.job for t in unhealthy_targets}:
-            raise HTTPException(status_code=404, detail=f"job {job!r} not found or has no unhealthy targets")
+            raise HTTPException(
+                status_code=404,
+                detail=f"job {job!r} not found or has no unhealthy targets",
+            )
     return {
         "job": job,
         "count": len(targets),

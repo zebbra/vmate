@@ -23,7 +23,7 @@ def parse_error(error: str) -> dict:
         body = re.sub(
             r"^An error has occurred while serving metrics:\s*\n+", "", body
         ).strip()
-        lines = [l.strip() for l in body.split("\n") if l.strip()]
+        lines = [ln.strip() for ln in body.split("\n") if ln.strip()]
         message = lines[-1] if lines else body
         return {"error": message, "target_url": url, "error_code": code}
 
