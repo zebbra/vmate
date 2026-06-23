@@ -2,6 +2,9 @@
 
 # vmate — Victoria Metrics Agent Target Exporter
 
+[![CI](https://github.com/zebbra/vmate/actions/workflows/ci.yml/badge.svg)](https://github.com/zebbra/vmate/actions/workflows/ci.yml)
+[![Image](https://img.shields.io/badge/quay.io-zebbra%2Fvmate-blue)](https://quay.io/repository/zebbra/vmate)
+
 
 ```mermaid
 flowchart LR
@@ -41,14 +44,6 @@ vmate solves this by acting as a proxy and summarizer for vmagent's `/api/v1/tar
 3. Unhealthy targets are aggregated, error messages are parsed into structured fields (`error`, `error_code`, `target_url`), and results are held in memory.
 4. Prometheus metrics are updated and the JSON API is served — no persistent storage needed.
 
-## Monitoring Loop: vmagent as scraper and target
-
-vmate polls vmagent's `/api/v1/targets` to detect unhealthy scrape targets — but vmagent is also the component that scrapes vmate's own `/metrics`. If vmagent goes down, both sides of this loop fail simultaneously: vmate loses visibility into the vmagent pods, and vmagent can no longer deliver vmate's metrics to the TSDB. The failure becomes invisible.
-
-To cover this gap, consider one of:
-
-- **Dedicated platform scrape job** — scrape vmate's `/metrics` from a separate, independent vmagent or Prometheus instance. Place it in its own job group (e.g. `platform-vmagent`) so it is not subject to the same failure domain.
-- **Deadman monitor on vmate's health endpoint** — use a synthetic/blackbox check against vmate's `/healthz` or `/summary` endpoint. If vmate itself stops responding, the deadman fires. This also catches cases where vmate loses connectivity to the vmagent pods entirely.
 
 ## Endpoints
 
@@ -139,3 +134,12 @@ vmate exposes data through two complementary interfaces, both suitable for Commo
 
 - **Prometheus / VictoriaMetrics datasource** — scrape `/metrics` to get all vmate metrics into your TSDB, then query them in Grafana dashboards and alerts the usual way.
 - **Infinity plugin (JSON)** — query the `/unhealthy`, `/summary`, or `/pod/{pod}/unhealthy` endpoints directly from Grafana using the [Infinity datasource](https://grafana.com/grafana/plugins/yesoreyeram-infinity-datasource/). Useful for ad-hoc exploration or dashboards that show raw target error details without a separate scrape pipeline.
+
+## Monitoring Loop: vmagent as scraper and target
+
+vmate polls vmagent's `/api/v1/targets` to detect unhealthy scrape targets — but vmagent is also the component that scrapes vmate's own `/metrics`. If vmagent goes down, both sides of this loop fail simultaneously: vmate loses visibility into the vmagent pods, and vmagent can no longer deliver vmate's metrics to the TSDB. The failure becomes invisible.
+
+To cover this gap, consider one of:
+
+- **Dedicated platform scrape job** — scrape vmate's `/metrics` from a separate, independent vmagent or Prometheus instance. Place it in its own job group (e.g. `platform-vmagent`) so it is not subject to the same failure domain.
+- **Deadman monitor on vmate's health endpoint** — use a synthetic/blackbox check against vmate's `/healthz` or `/summary` endpoint. If vmate itself stops responding, the deadman fires. This also catches cases where vmate loses connectivity to the vmagent pods entirely.
