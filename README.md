@@ -2,12 +2,11 @@
 
 # vmate — Victoria Metrics Agent Target Exporter
 
-## Overview
 
 ```mermaid
 flowchart LR
     grafana["Grafana"]
-    vm["plattform vmagent"]
+    vm["vmagent-y"]
 
     subgraph k8s["OpenShift/Kubernetes cluster"]
         direction LR
@@ -43,6 +42,15 @@ vmate solves this by acting as a proxy and summarizer for vmagent's `/api/v1/tar
 2. Each pod's `/api/v1/targets` is queried concurrently.
 3. Unhealthy targets are aggregated, error messages are parsed into structured fields (`error`, `error_code`, `target_url`), and results are held in memory.
 4. Prometheus metrics are updated and the JSON API is served — no persistent storage needed.
+
+## Monitoring Loop: vmagent as scraper and target
+
+vmate polls vmagent's `/api/v1/targets` to detect unhealthy scrape targets — but vmagent is also the component that scrapes vmate's own `/metrics`. If vmagent goes down, both sides of this loop fail simultaneously: vmate loses visibility into the vmagent pods, and vmagent can no longer deliver vmate's metrics to the TSDB. The failure becomes invisible.
+
+To cover this gap, consider one of:
+
+- **Dedicated platform scrape job** — scrape vmate's `/metrics` from a separate, independent vmagent or Prometheus instance. Place it in its own job group (e.g. `platform-vmagent`) so it is not subject to the same failure domain.
+- **Deadman monitor on vmate's health endpoint** — use a synthetic/blackbox check against vmate's `/healthz` or `/summary` endpoint. If vmate itself stops responding, the deadman fires. This also catches cases where vmate loses connectivity to the vmagent pods entirely.
 
 ## Endpoints
 
