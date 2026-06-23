@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     label_selector: str = "app.kubernetes.io/instance=victoria-metrics-agent"
     namespace: str = "monitoring"
     vmagent_port: int = 8429
-    poll_interval: int = 60  # seconds
+    poll_interval: int = 113  # seconds (prime to avoid phase-lock with scrape intervals)
     vmagent_timeout: int = 10  # seconds per pod request
 
     # comma-separated job names excluded from unhealthy_target_info metric and /unhealthy endpoints

@@ -42,7 +42,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "avg(vmagent_instances_configured)",
+                      "expr": "avg(vmate_instances_configured)",
                       "range": true
                     },
                     "version": "v0"
@@ -421,7 +421,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "avg(vmagent_instances_reachable)",
+                      "expr": "avg(vmate_instances_reachable)",
                       "legendFormat": "{{instance}}",
                       "range": true
                     },
@@ -505,7 +505,7 @@
                     "group": "prometheus",
                     "kind": "DataQuery",
                     "spec": {
-                      "expr": "sum(vmagent_unhealthy_target_info)"
+                      "expr": "sum(vmate_unhealthy_target_info)"
                     },
                     "version": "v0"
                   },
@@ -584,7 +584,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "vmagent_targets_total{state=\"up\"}",
+                      "expr": "vmate_targets_total{state=\"up\"}",
                       "legendFormat": "{{pod}} up",
                       "range": true
                     },
@@ -605,7 +605,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "vmagent_targets_total{state=\"down\"}",
+                      "expr": "vmate_targets_total{state=\"down\"}",
                       "legendFormat": "{{pod}} down",
                       "range": true
                     },
@@ -1037,7 +1037,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "vmagent_job_targets_total{state=\"down\"}",
+                      "expr": "vmate_job_targets_total{state=\"down\"}",
                       "legendFormat": "{{exported_job}}",
                       "range": true
                     },

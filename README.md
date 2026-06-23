@@ -6,23 +6,27 @@
 
 ```mermaid
 flowchart LR
-    grafana["Grafana / vmalert"]
+    grafana["Grafana"]
+    vm["Grafana / vmagent"]
 
-    subgraph k8s["Kubernetes cluster"]
+    subgraph k8s["OpenShift/Kubernetes cluster"]
         direction LR
         vmate(["vmate"])
         subgraph agents["vmagent pods"]
             va1["vmagent-0"]
             va2["vmagent-1"]
             va3["vmagent-2"]
+            va4["vmagent-n"]
         end
         vmate -->|"poll /api/v1/targets"| va1
         vmate -->|"poll /api/v1/targets"| va2
         vmate -->|"poll /api/v1/targets"| va3
+        vmate -->|"poll /api/v1/targets"| va4
     end
 
-    grafana -->|"scrape /metrics"| vmate
-    vmate -->|"/unhealthy JSON"| grafana
+    grafana -->|"VM Datasource"| vm
+    vm -->|"scrape /metrics"| vmate
+    grafana -->|"InfinityPlugin/unhealthy JSON"| vmate
 
     style k8s stroke-dasharray: 5 5, fill: none
 ```
@@ -58,11 +62,11 @@ vmate solves this by acting as a proxy and summarizer for vmagent's `/api/v1/tar
 
 | Metric | Labels | Description |
 |---|---|---|
-| `vmagent_instances_configured` | — | Pods discovered via label selector |
-| `vmagent_instances_reachable` | — | Pods that responded on last poll |
-| `vmagent_targets_total` | `pod`, `state` | Target counts per pod and state |
-| `vmagent_job_targets_total` | `job`, `state` | Fleet-wide target counts per job and state |
-| `vmagent_unhealthy_target_info` | `pod`, `scrape_pool`, `job`, `instance` | 1 per unhealthy target, 0 on recovery |
+| `vmate_instances_configured` | — | Pods discovered via label selector |
+| `vmate_instances_reachable` | — | Pods that responded on last poll |
+| `vmate_targets_total` | `pod`, `state` | Target counts per pod and state |
+| `vmate_job_targets_total` | `job`, `state` | Fleet-wide target counts per job and state |
+| `vmate_unhealthy_target_info` | `pod`, `scrape_pool`, `job`, `instance` | 1 per unhealthy target, 0 on recovery |
 
 ## Configuration
 
@@ -73,9 +77,9 @@ All options are set via environment variables with the `VMTE_` prefix.
 | `VMTE_NAMESPACE` | `monitoring` | Namespace to discover vmagent pods in |
 | `VMTE_LABEL_SELECTOR` | `app.kubernetes.io/instance=victoria-metrics-agent` | Label selector for vmagent pods |
 | `VMTE_VMAGENT_PORT` | `8429` | Port to query on each vmagent pod |
-| `VMTE_POLL_INTERVAL` | `60` | Seconds between poll cycles |
+| `VMTE_POLL_INTERVAL` | `113` | Seconds between poll cycles |
 | `VMTE_VMAGENT_TIMEOUT` | `10` | Per-pod request timeout in seconds |
-| `VMTE_IGNORE_INFO_JOBS` | `` | Comma-separated jobs excluded from `vmagent_unhealthy_target_info` and `/unhealthy` endpoints |
+| `VMTE_IGNORE_INFO_JOBS` | `` | Comma-separated jobs excluded from `vmate_unhealthy_target_info` and `/unhealthy` endpoints |
 | `VMTE_IGNORE_HEALTH_JOBS` | `` | Comma-separated jobs excluded from all target count metrics |
 
 `VMTE_IGNORE_INFO_JOBS` and `VMTE_IGNORE_HEALTH_JOBS` are independent — useful for suppressing noise from known-flapping jobs without losing health counts, or vice versa.
@@ -89,25 +93,39 @@ groups:
   - name: vmate
     rules:
       - alert: VmagentPodUnreachable
-        expr: vmagent_instances_reachable < vmagent_instances_configured
+        expr: vmate_instances_reachable < vmate_instances_configured
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "One or more vmagent pods are not reachable"
-          description: "{{ $value }} of {{ printf `vmagent_instances_configured` | query | first | value }} configured vmagent pods did not respond on the last poll cycle."
+          description: "{{ $value }} of {{ printf `vmate_instances_configured` | query | first | value }} configured vmagent pods did not respond on the last poll cycle."
 
       - alert: VmagentUnhealthyTargets
-        expr: sum by (job) (vmagent_job_targets_total{state="unhealthy"}) > 0
+        expr: sum by (job) (vmate_job_targets_total{state="unhealthy"}) > 0
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Scrape job {{ $labels.job }} has unhealthy targets"
           description: "{{ $value }} targets in job {{ $labels.job }} have been unhealthy for more than 10 minutes."
+
+      - alert: VmagentDownTargetsSurge
+        expr: |
+          delta(vmate_job_targets_total{state="down"}[1h])
+            / clamp_min(vmate_job_targets_total{state="down"} offset 1h, 1)
+            > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape job {{ $labels.job }} has a surge in down targets"
+          description: "Down targets for job {{ $labels.job }} increased by more than 20% over the last hour."
 ```
 
 Adjust `for` durations and `severity` labels to match your environment's alerting policy.
+
+> **Note on `VmagentDownTargetsSurge`:** uses `delta()` on a Gauge (not `increase()` which is for counters). The 20% threshold is a starting point — tune it to your fleet size. A vmate restart resets all gauges to zero and will cause a transient false positive; consider suppressing during known restarts or adding `and vmate_instances_reachable > 0`.
 
 ## Grafana integration
 
