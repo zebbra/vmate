@@ -7,7 +7,7 @@
 ```mermaid
 flowchart LR
     grafana["Grafana"]
-    vm["Grafana / vmagent"]
+    vm["plattform vmagent"]
 
     subgraph k8s["OpenShift/Kubernetes cluster"]
         direction LR
@@ -18,15 +18,15 @@ flowchart LR
             va3["vmagent-2"]
             va4["vmagent-n"]
         end
-        vmate -->|"poll /api/v1/targets"| va1
-        vmate -->|"poll /api/v1/targets"| va2
-        vmate -->|"poll /api/v1/targets"| va3
-        vmate -->|"poll /api/v1/targets"| va4
+        vmate -->|"poll\n/api/v1/targets"| va1
+        vmate -->|"poll\n /api/v1/targets"| va2
+        vmate -->|"poll\n /api/v1/targets"| va3
+        vmate -->|"poll\n /api/v1/targets"| va4
     end
 
     grafana -->|"VM Datasource"| vm
-    vm -->|"scrape /metrics"| vmate
-    grafana -->|"InfinityPlugin/unhealthy JSON"| vmate
+    vm -->|"scrape\n /metrics"| vmate
+    grafana -->|"InfinityPlugin \n /unhealthy JSON"| vmate
 
     style k8s stroke-dasharray: 5 5, fill: none
 ```
