@@ -21,6 +21,7 @@ class _CsvEnvSource(EnvSettingsSource):
 class Settings(BaseSettings):
     label_selector: str = "app.kubernetes.io/instance=victoria-metrics-agent"
     namespace: str = "monitoring"
+    log_level: str = "INFO"
     vmagent_port: int = 8429
     poll_interval: int = (
         113  # seconds (prime to avoid phase-lock with scrape intervals)

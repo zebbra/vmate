@@ -82,6 +82,7 @@ All options are set via environment variables with the `VMTE_` prefix.
 | `VMTE_VMAGENT_TIMEOUT` | `10` | Per-pod request timeout in seconds |
 | `VMTE_IGNORE_INFO_JOBS` | `` | Comma-separated jobs excluded from `vmate_unhealthy_target_info` and `/unhealthy` endpoints |
 | `VMTE_IGNORE_HEALTH_JOBS` | `` | Comma-separated jobs excluded from all target count metrics |
+| `VMTE_LOG_LEVEL` | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 
 `VMTE_IGNORE_INFO_JOBS` and `VMTE_IGNORE_HEALTH_JOBS` are independent — useful for suppressing noise from known-flapping jobs without losing health counts, or vice versa.
 

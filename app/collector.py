@@ -131,3 +131,15 @@ async def collect_all() -> None:
     instances_reachable.set(reachable)
     unhealthy_targets.clear()
     unhealthy_targets.extend(all_unhealthy)
+
+    total_up = sum(c for (_, state), c in job_counts.items() if state == "up")
+    total_down = sum(c for (_, state), c in job_counts.items() if state == "down")
+    log = logger.warning if reachable != len(pods) else logger.info
+    log(
+        "poll done: %d/%d pods reachable, %d up, %d down, %d unhealthy targets",
+        reachable,
+        len(pods),
+        total_up,
+        total_down,
+        len(all_unhealthy),
+    )

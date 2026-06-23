@@ -10,8 +10,9 @@ from .config import settings
 from .discovery import discover_pods, load_k8s_config
 from .errors import parse_error
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=settings.log_level.upper())
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="vmate")
