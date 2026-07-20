@@ -32,6 +32,7 @@ unhealthy_targets: list[UnhealthyTarget] = []
 
 _known_unhealthy: dict[str, set[tuple]] = defaultdict(set)
 _known_job_states: set[tuple] = set()
+_known_pods: set[str] = set()
 
 
 async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod) -> dict | None:
@@ -109,23 +110,31 @@ async def collect_all() -> None:
                 targets_total.labels(pod=pod.name, state=state).set(pod_counts[state])
 
             for stale in _known_unhealthy[pod.name] - current_unhealthy:
-                unhealthy_target_info.labels(
-                    pod=stale[0],
-                    scrape_pool=stale[1],
-                    job=stale[2],
-                    instance=stale[3],
-                ).set(0)
+                unhealthy_target_info.remove(*stale)
 
             _known_unhealthy[pod.name] = current_unhealthy
 
-    # update job_targets_total, zero out stale job/state combos
+    # drop metrics for pods that vanished from discovery (e.g. scale-down) —
+    # otherwise their last-known values sit in the gauges forever
+    global _known_pods
+    current_pod_names = {p.name for p in pods}
+    for stale_pod in _known_pods - current_pod_names:
+        for state in ("up", "down", "unknown"):
+            targets_total.remove(stale_pod, state)
+        for stale in _known_unhealthy.pop(stale_pod, ()):
+            unhealthy_target_info.remove(*stale)
+    _known_pods = current_pod_names
+
+    # update job_targets_total, drop stale job/state combos instead of
+    # leaving them at 0 forever — job/state cardinality is unbounded over
+    # time as scrape jobs come and go, so unset combos must be freed, not zeroed
     global _known_job_states
     current_job_states: set[tuple] = set()
     for (job, state), count in job_counts.items():
         job_targets_total.labels(job=job, state=state).set(count)
         current_job_states.add((job, state))
     for stale in _known_job_states - current_job_states:
-        job_targets_total.labels(job=stale[0], state=stale[1]).set(0)
+        job_targets_total.remove(*stale)
     _known_job_states = current_job_states
 
     instances_reachable.set(reachable)
