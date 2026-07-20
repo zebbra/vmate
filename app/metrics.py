@@ -12,13 +12,15 @@ instances_reachable = Gauge(
 
 targets_total = Gauge(
     "vmate_targets_total",
-    "Number of scrape targets per pod and state",
+    "Number of non-up scrape targets (down/unknown) per pod and state — "
+    "up targets are not polled or counted",
     ["pod", "state"],
 )
 
 job_targets_total = Gauge(
     "vmate_job_targets_total",
-    "Number of scrape targets per job and state (fleet-wide, excludes ignore_health_jobs)",
+    "Number of non-up scrape targets (down/unknown) per job and state, "
+    "fleet-wide, excludes ignore_health_jobs — up targets are not polled or counted",
     ["job", "state"],
 )
 

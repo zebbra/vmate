@@ -37,7 +37,15 @@ _known_pods: set[str] = set()
 
 async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod) -> dict | None:
     try:
-        r = await client.get(pod.targets_url, timeout=settings.vmagent_timeout)
+        # vmagent-side filter: for fleets with tens of thousands of targets,
+        # pulling and parsing the full "up" set every cycle is what drives
+        # memory use, not anything we do with it afterwards — we only care
+        # about non-up targets anyway
+        r = await client.get(
+            pod.targets_url,
+            params={"show_only_unhealthy": "true"},
+            timeout=settings.vmagent_timeout,
+        )
         r.raise_for_status()
         return r.json()
     except Exception as e:
@@ -46,7 +54,7 @@ async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod) -> dict | None:
 
 
 def _clear_pod_metrics(pod_name: str) -> None:
-    for state in ("up", "down", "unknown"):
+    for state in ("down", "unknown"):
         targets_total.labels(pod=pod_name, state=state).set(0)
 
 
@@ -106,7 +114,7 @@ async def collect_all() -> None:
                             instance=key[3],
                         ).set(1)
 
-            for state in ("up", "down", "unknown"):
+            for state in ("down", "unknown"):
                 targets_total.labels(pod=pod.name, state=state).set(pod_counts[state])
 
             for stale in _known_unhealthy[pod.name] - current_unhealthy:
@@ -119,7 +127,7 @@ async def collect_all() -> None:
     global _known_pods
     current_pod_names = {p.name for p in pods}
     for stale_pod in _known_pods - current_pod_names:
-        for state in ("up", "down", "unknown"):
+        for state in ("down", "unknown"):
             targets_total.remove(stale_pod, state)
         for stale in _known_unhealthy.pop(stale_pod, ()):
             unhealthy_target_info.remove(*stale)
@@ -141,14 +149,12 @@ async def collect_all() -> None:
     unhealthy_targets.clear()
     unhealthy_targets.extend(all_unhealthy)
 
-    total_up = sum(c for (_, state), c in job_counts.items() if state == "up")
     total_down = sum(c for (_, state), c in job_counts.items() if state == "down")
     log = logger.warning if reachable != len(pods) else logger.info
     log(
-        "poll done: %d/%d pods reachable, %d up, %d down, %d unhealthy targets",
+        "poll done: %d/%d pods reachable, %d down, %d unhealthy targets",
         reachable,
         len(pods),
-        total_up,
         total_down,
         len(all_unhealthy),
     )

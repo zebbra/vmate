@@ -65,8 +65,8 @@ vmate solves this by acting as a proxy and summarizer for vmagent's `/api/v1/tar
 |---|---|---|
 | `vmate_instances_configured` | — | Pods discovered via label selector |
 | `vmate_instances_reachable` | — | Pods that responded on last poll |
-| `vmate_targets_total` | `pod`, `state` | Target counts per pod and state |
-| `vmate_job_targets_total` | `job`, `state` | Fleet-wide target counts per job and state |
+| `vmate_targets_total` | `pod`, `state` | Non-up (`down`/`unknown`) target counts per pod and state — up targets are not polled or counted |
+| `vmate_job_targets_total` | `job`, `state` | Fleet-wide non-up (`down`/`unknown`) target counts per job and state |
 | `vmate_unhealthy_target_info` | `pod`, `scrape_pool`, `job`, `instance` | 1 per unhealthy target, 0 on recovery |
 
 ## Configuration
@@ -104,7 +104,7 @@ groups:
           description: "{{ $value }} of {{ printf `vmate_instances_configured` | query | first | value }} configured vmagent pods did not respond on the last poll cycle."
 
       - alert: VmagentUnhealthyTargets
-        expr: sum by (job) (vmate_job_targets_total{state="unhealthy"}) > 0
+        expr: sum by (job) (vmate_job_targets_total{state="down"}) > 0
         for: 10m
         labels:
           severity: warning
