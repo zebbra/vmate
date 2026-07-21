@@ -3,6 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 
 import httpx
+import ijson
 
 from .config import settings
 from .discovery import VmagentPod, discover_pods
@@ -15,6 +16,33 @@ from .metrics import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _AsyncIterToReader:
+    """Adapts an async byte-chunk iterator (httpx's aiter_bytes) to the
+    async file-like .read() interface ijson.items_async expects."""
+
+    def __init__(self, aiter):
+        self._aiter = aiter
+        self._buf = bytearray()
+        self._done = False
+
+    async def read(self, n: int = -1) -> bytes:
+        if n == 0:
+            return b""
+        while not self._done and (n < 0 or len(self._buf) < n):
+            try:
+                chunk = await self._aiter.__anext__()
+            except StopAsyncIteration:
+                self._done = True
+                break
+            self._buf.extend(chunk)
+        if n < 0:
+            result, self._buf = bytes(self._buf), bytearray()
+        else:
+            result = bytes(self._buf[:n])
+            del self._buf[:n]
+        return result
 
 
 @dataclass
@@ -35,26 +63,24 @@ _known_job_states: set[tuple] = set()
 _known_pods: set[str] = set()
 
 
-async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod) -> dict | None:
-    try:
-        # vmagent-side filter: for fleets with tens of thousands of targets,
-        # pulling and parsing the full "up" set every cycle is what drives
-        # memory use, not anything we do with it afterwards — we only care
-        # about non-up targets anyway
-        r = await client.get(
-            pod.targets_url,
-            params={"show_only_unhealthy": "true"},
-            timeout=settings.vmagent_timeout,
-        )
+async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod):
+    """Streams each active target one at a time via ijson instead of
+    buffering the whole response into one parsed structure — some vmagent
+    shards report 10k+ targets, and materializing that (each one carrying a
+    labels/discoveredLabels dict) all at once is what was driving OOMs, not
+    anything done with the data afterwards.
+    """
+    async with client.stream(
+        "GET", pod.targets_url, timeout=settings.vmagent_timeout
+    ) as r:
         r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        logger.warning("failed to poll %s: %s", pod.name, e)
-        return None
+        reader = _AsyncIterToReader(r.aiter_bytes())
+        async for target in ijson.items_async(reader, "data.activeTargets.item"):
+            yield target
 
 
 def _clear_pod_metrics(pod_name: str) -> None:
-    for state in ("down", "unknown"):
+    for state in ("up", "down", "unknown"):
         targets_total.labels(pod=pod_name, state=state).set(0)
 
 
@@ -68,53 +94,51 @@ async def collect_all() -> None:
 
     async with httpx.AsyncClient() as client:
         for pod in pods:
-            data = await poll_pod(client, pod)
-            if data is None:
+            pod_counts: dict[str, int] = defaultdict(int)
+            current_unhealthy: set[tuple] = set()
+
+            try:
+                async for t in poll_pod(client, pod):
+                    health = t.get("health", "unknown")
+                    labels_map = t.get("labels", {})
+                    job = labels_map.get("job", "")
+
+                    if job not in settings.ignore_health_jobs:
+                        pod_counts[health] += 1
+                        job_counts[(job, health)] += 1
+
+                    if health != "up":
+                        key = (
+                            pod.name,
+                            t.get("scrapePool", ""),
+                            job,
+                            labels_map.get("instance", ""),
+                        )
+                        all_unhealthy.append(
+                            UnhealthyTarget(
+                                pod=key[0],
+                                scrape_pool=key[1],
+                                job=key[2],
+                                instance=key[3],
+                                error=t.get("lastError", ""),
+                                health=health,
+                            )
+                        )
+                        if job not in settings.ignore_info_jobs:
+                            current_unhealthy.add(key)
+                            unhealthy_target_info.labels(
+                                pod=key[0],
+                                scrape_pool=key[1],
+                                job=key[2],
+                                instance=key[3],
+                            ).set(1)
+            except Exception as e:
+                logger.warning("failed to poll %s: %s", pod.name, e)
                 _clear_pod_metrics(pod.name)
                 continue
 
             reachable += 1
-            active = data.get("data", {}).get("activeTargets", [])
-
-            pod_counts: dict[str, int] = defaultdict(int)
-            current_unhealthy: set[tuple] = set()
-
-            for t in active:
-                health = t.get("health", "unknown")
-                labels_map = t.get("labels", {})
-                job = labels_map.get("job", "")
-
-                if job not in settings.ignore_health_jobs:
-                    pod_counts[health] += 1
-                    job_counts[(job, health)] += 1
-
-                if health != "up":
-                    key = (
-                        pod.name,
-                        t.get("scrapePool", ""),
-                        job,
-                        labels_map.get("instance", ""),
-                    )
-                    all_unhealthy.append(
-                        UnhealthyTarget(
-                            pod=key[0],
-                            scrape_pool=key[1],
-                            job=key[2],
-                            instance=key[3],
-                            error=t.get("lastError", ""),
-                            health=health,
-                        )
-                    )
-                    if job not in settings.ignore_info_jobs:
-                        current_unhealthy.add(key)
-                        unhealthy_target_info.labels(
-                            pod=key[0],
-                            scrape_pool=key[1],
-                            job=key[2],
-                            instance=key[3],
-                        ).set(1)
-
-            for state in ("down", "unknown"):
+            for state in ("up", "down", "unknown"):
                 targets_total.labels(pod=pod.name, state=state).set(pod_counts[state])
 
             for stale in _known_unhealthy[pod.name] - current_unhealthy:
@@ -127,7 +151,7 @@ async def collect_all() -> None:
     global _known_pods
     current_pod_names = {p.name for p in pods}
     for stale_pod in _known_pods - current_pod_names:
-        for state in ("down", "unknown"):
+        for state in ("up", "down", "unknown"):
             targets_total.remove(stale_pod, state)
         for stale in _known_unhealthy.pop(stale_pod, ()):
             unhealthy_target_info.remove(*stale)
@@ -149,12 +173,14 @@ async def collect_all() -> None:
     unhealthy_targets.clear()
     unhealthy_targets.extend(all_unhealthy)
 
+    total_up = sum(c for (_, state), c in job_counts.items() if state == "up")
     total_down = sum(c for (_, state), c in job_counts.items() if state == "down")
     log = logger.warning if reachable != len(pods) else logger.info
     log(
-        "poll done: %d/%d pods reachable, %d down, %d unhealthy targets",
+        "poll done: %d/%d pods reachable, %d up, %d down, %d unhealthy targets",
         reachable,
         len(pods),
+        total_up,
         total_down,
         len(all_unhealthy),
     )
