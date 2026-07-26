@@ -1,7 +1,8 @@
 import logging
 from dataclasses import dataclass
 
-from kubernetes import client, config as k8s_config
+from kubernetes import client
+from kubernetes import config as k8s_config
 from kubernetes.client.exceptions import ApiException
 
 from .config import settings

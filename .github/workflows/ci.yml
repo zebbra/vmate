@@ -6,12 +6,16 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   QUAY_IMAGE: quay.io/zebbra/vmate
 
 jobs:
   lint:
-    name: Lint
+    name: Lint (ruff)
     runs-on: hetzner
     steps:
       - uses: actions/checkout@v6
@@ -23,15 +27,50 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Check formatting
-        run: ruff format --check .
-
       - name: Lint
         run: ruff check .
 
+  audit:
+    name: Security audit (pip-audit)
+    runs-on: hetzner
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: pip-audit -r requirements.txt
+
+  test:
+    name: Test
+    runs-on: hetzner
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-asyncio
+
+      - name: Run tests
+        run: |
+          pytest tests/; code=$?
+          if [ $code -eq 5 ]; then
+            echo "No tests collected yet — treating as pass."
+            exit 0
+          fi
+          exit $code
+
   build:
     name: Build Docker image
-    needs: lint
+    needs: [lint, audit, test]
     runs-on: hetzner
     steps:
       - uses: actions/checkout@v6

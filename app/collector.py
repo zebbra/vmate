@@ -70,9 +70,7 @@ async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod):
     labels/discoveredLabels dict) all at once is what was driving OOMs, not
     anything done with the data afterwards.
     """
-    async with client.stream(
-        "GET", pod.targets_url, timeout=settings.vmagent_timeout
-    ) as r:
+    async with client.stream("GET", pod.targets_url, timeout=settings.vmagent_timeout) as r:
         r.raise_for_status()
         reader = _AsyncIterToReader(r.aiter_bytes())
         async for target in ijson.items_async(reader, "data.activeTargets.item"):
