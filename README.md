@@ -150,7 +150,7 @@ vmate exposes data through two complementary interfaces, both suitable for Commo
 
 ### Dashboard
 
-[`dashboard.json`](dashboard.json) is a Grafana v2 dashboard resource (uid `vmate`). Its variables keep it environment independent:
+[`dashboards/vmate.json`](dashboards/vmate.json) is a Grafana v2 dashboard resource (uid `vmate`). Its variables keep it environment independent:
 
 | Variable | Default | Purpose |
 |---|---|---|
