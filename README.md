@@ -40,24 +40,35 @@ vmate solves this by acting as a proxy and summarizer for vmagent's `/api/v1/tar
 ## How it works
 
 1. On startup (and every poll cycle) vmate discovers vmagent pods via the Kubernetes API using a configurable label selector.
-2. Each pod's `/api/v1/targets` is queried concurrently.
+2. Each pod's `/api/v1/targets` is queried in turn and streamed, so large shards don't have to fit in memory at once.
 3. Unhealthy targets are aggregated, error messages are parsed into structured fields (`error`, `error_code`, `target_url`), and results are held in memory.
 4. Prometheus metrics are updated and the JSON API is served — no persistent storage needed.
+
+## Web UI
+
+`/` serves a self-contained status page (no CDN, no build step, works air-gapped). It shows which vmagent pods answered the last poll, unhealthy targets grouped by job, error or pod with a filter, and warns when the data is stale (last poll older than 3× the poll interval).
+
+It reads vmate's own endpoints, so it keeps working when Grafana, vmselect or the scrape pipeline are down: a break-glass view of what vmagent actually sees right now.
 
 
 ## Endpoints
 
 | Endpoint | Description |
 |---|---|
-| `/` | Index with links |
+| `/` | Web UI (see above) |
 | `/metrics` | Prometheus metrics |
 | `/unhealthy` | All unhealthy targets across all pods |
 | `/unhealthy?raw=true` | Same but with unparsed error strings |
 | `/pod/{pod}/unhealthy` | Unhealthy targets for a specific vmagent pod |
 | `/job/{job}/unhealthy` | Unhealthy targets for a specific scrape job |
+| `/status` | Last poll: time, duration and per-pod reachability with up/down/unknown counts |
 | `/summary` | Runtime state: discovered pods, unhealthy count and affected jobs |
 | `/config` | Static settings: label selector, intervals, blacklists |
 | `/healthz` | Health check |
+
+## Image
+
+Every push to `main` publishes `quay.io/zebbra/vmate:<short-sha>` and `:latest`. Pin the short-sha tag in deployments and bump it with a commit; `latest` with `pullPolicy: Always` upgrades silently on the next pod restart.
 
 ## Metrics
 
