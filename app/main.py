@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import time
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from .collector import collect_all, unhealthy_targets
+from .collector import collect_all, poll_status, unhealthy_targets
 from .config import settings
 from .discovery import discover_pods, load_k8s_config
 from .errors import parse_error
@@ -41,27 +43,25 @@ async def _poll_loop() -> None:
         await asyncio.sleep(settings.poll_interval)
 
 
+_INDEX_HTML = (Path(__file__).parent / "static" / "index.html").read_text()
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index() -> HTMLResponse:
-    return HTMLResponse("""
-<html><head><title>vmate</title></head>
-<body>
-<h2>vmate — Victoria Metrics Agent Target Exporter</h2>
-<ul>
-  <li><a href="/unhealthy">/unhealthy</a> — all unhealthy targets across all pods</li>
-  <li><a href="/pod/{pod}/unhealthy">/pod/{pod}/unhealthy</a> — unhealthy targets for a specific pod</li>
-  <li><a href="/job/{job}/unhealthy">/job/{job}/unhealthy</a> — unhealthy targets for a specific job</li>
-  <li><a href="/summary">/summary</a> — runtime state: discovered pods, unhealthy count and jobs</li>
-  <li><a href="/config">/config</a> — static settings: label selector, intervals, blacklists</li>
-  <li><a href="/metrics">/metrics</a> — Prometheus metrics</li>
-  <li><a href="/healthz">/healthz</a> — health check</li>
-</ul>
-<h4>Query flags</h4>
-<ul>
-  <li><code>?raw=true</code> — on any <code>/unhealthy</code> endpoint: return the original unparsed error string instead of the structured <code>error</code> / <code>error_code</code> / <code>target_url</code> fields</li>
-</ul>
-</body></html>
-""")
+    return HTMLResponse(_INDEX_HTML)
+
+
+@app.get("/status")
+async def status() -> dict:
+    last = poll_status["last_poll"]
+    return {
+        "last_poll": last,
+        "age_seconds": round(time.time() - last, 1) if last else None,
+        "poll_interval": settings.poll_interval,
+        "poll_duration": poll_status["duration"],
+        "pods": [{"name": n, **v} for n, v in sorted(poll_status["pods"].items())],
+        "unhealthy_count": len(unhealthy_targets),
+    }
 
 
 @app.get("/unhealthy")

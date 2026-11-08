@@ -12,7 +12,7 @@ select = [
     "I",   # isort (import sorting): deterministic import order
 ]
 ignore = [
-    "E501",  # line too long: main.py's index() embeds a multi-hundred-char HTML template string
+    "E501",  # line too long: long error-string fixtures in tests
 ]
 
 [tool.pytest.ini_options]

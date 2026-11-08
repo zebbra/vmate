@@ -87,3 +87,37 @@ async def test_job_unhealthy_404_for_unknown_job(client):
     unhealthy_targets.clear()
     r = await client.get("/job/nonexistent/unhealthy")
     assert r.status_code == 404
+
+
+async def test_index_serves_ui(client):
+    r = await client.get("/")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    assert "vmate" in r.text
+    assert 'fetch("status"' in r.text
+
+
+async def test_status_before_first_poll(client):
+    r = await client.get("/status")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["last_poll"] is None
+    assert body["age_seconds"] is None
+    assert body["pods"] == []
+
+
+async def test_status_lists_pods_sorted(client):
+    from app.collector import poll_status
+
+    poll_status.update(
+        last_poll=1.0,
+        duration=0.5,
+        pods={
+            "vmagent-1": {"reachable": False, "error": "timeout"},
+            "vmagent-0": {"reachable": True, "error": None, "up": 3, "down": 0, "unknown": 0},
+        },
+    )
+    body = (await client.get("/status")).json()
+    assert [p["name"] for p in body["pods"]] == ["vmagent-0", "vmagent-1"]
+    assert body["pods"][1]["error"] == "timeout"
+    assert body["poll_duration"] == 0.5

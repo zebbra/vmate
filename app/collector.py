@@ -1,4 +1,5 @@
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -62,6 +63,9 @@ _known_unhealthy: dict[str, set[tuple]] = defaultdict(set)
 _known_job_states: set[tuple] = set()
 _known_pods: set[str] = set()
 
+# last poll cycle for the UI; mutated in place like unhealthy_targets
+poll_status: dict = {"last_poll": None, "duration": None, "pods": {}}
+
 
 async def poll_pod(client: httpx.AsyncClient, pod: VmagentPod):
     """Streams each active target one at a time via ijson instead of
@@ -86,6 +90,8 @@ async def collect_all() -> None:
     pods = discover_pods()
     instances_configured.set(len(pods))
 
+    started = time.time()
+    pod_status: dict[str, dict] = {}
     reachable = 0
     all_unhealthy: list[UnhealthyTarget] = []
     job_counts: dict[tuple[str, str], int] = defaultdict(int)  # (job, state) -> count
@@ -133,7 +139,14 @@ async def collect_all() -> None:
             except Exception as e:
                 logger.warning("failed to poll %s: %s", pod.name, e)
                 _clear_pod_metrics(pod.name)
+                pod_status[pod.name] = {"reachable": False, "error": str(e) or type(e).__name__}
                 continue
+
+            pod_status[pod.name] = {
+                "reachable": True,
+                "error": None,
+                **{s: pod_counts[s] for s in ("up", "down", "unknown")},
+            }
 
             reachable += 1
             for state in ("up", "down", "unknown"):
@@ -170,6 +183,7 @@ async def collect_all() -> None:
     instances_reachable.set(reachable)
     unhealthy_targets.clear()
     unhealthy_targets.extend(all_unhealthy)
+    poll_status.update(last_poll=time.time(), duration=round(time.time() - started, 2), pods=pod_status)
 
     total_up = sum(c for (_, state), c in job_counts.items() if state == "up")
     total_down = sum(c for (_, state), c in job_counts.items() if state == "down")

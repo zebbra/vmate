@@ -24,6 +24,7 @@ def reset_collector_state():
     collector._known_job_states.clear()
     collector._known_pods.clear()
     collector.unhealthy_targets.clear()
+    collector.poll_status.update(last_poll=None, duration=None, pods={})
     yield
 
 

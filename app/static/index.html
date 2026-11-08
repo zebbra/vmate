@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vmate</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #677085; --line: #e2e5eb;
+  --ok: #1a7f37; --ok-bg: #e6f4ea; --warn: #9a6700; --warn-bg: #fff4d6; --bad: #c62828; --bad-bg: #fdecea;
+  --accent: #2f6fde; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --panel: #1b1f27; --text: #e3e6ec; --muted: #8a93a6; --line: #2a303b;
+    --ok: #4ac26b; --ok-bg: #16301f; --warn: #d4a72c; --warn-bg: #33290f; --bad: #ff6b6b; --bad-bg: #3a1a1a;
+    --accent: #6ea1ff;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { margin: 0; font-size: 18px; font-weight: 650; }
+header .sub { color: var(--muted); font-size: 13px; }
+header .spacer { flex: 1; }
+main { max-width: 1400px; margin: 0 auto; padding: 16px 20px 40px; }
+.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-weight: 600; font-size: 12px; letter-spacing: .02em; }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+.pill.warn { color: var(--warn); background: var(--warn-bg); }
+.pill.bad { color: var(--bad); background: var(--bad-bg); }
+button, select, input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+label.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+.banner { display: none; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; font-weight: 500; }
+.banner.show { display: block; }
+.banner.bad { color: var(--bad); background: var(--bad-bg); }
+.banner.warn { color: var(--warn); background: var(--warn-bg); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.kpi .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.kpi .value { font-size: 26px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.kpi .value.ok { color: var(--ok); } .kpi .value.warn { color: var(--warn); } .kpi .value.bad { color: var(--bad); }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 16px; }
+section > h2 { margin: 0; padding: 12px 14px; font-size: 15px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+section > h2 .tools { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; font-weight: 400; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 7px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.mono, .mono { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+tr:last-child td { border-bottom: none; }
+.group { border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: none; }
+.group > summary { cursor: pointer; padding: 9px 14px; display: flex; gap: 10px; align-items: baseline; list-style: none; }
+.group > summary::-webkit-details-marker { display: none; }
+.group > summary::before { content: "▸"; color: var(--muted); width: 1em; }
+.group[open] > summary::before { content: "▾"; }
+.group > summary .name { font-weight: 600; word-break: break-all; }
+.group > summary .count { margin-left: auto; color: var(--bad); font-weight: 650; font-variant-numeric: tabular-nums; }
+.group table { background: var(--bg); }
+.empty { padding: 18px 14px; color: var(--muted); }
+.code { display: inline-block; min-width: 2.6em; text-align: center; padding: 1px 6px; border-radius: 4px; background: var(--bad-bg); color: var(--bad); font-weight: 600; font-size: 12px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+footer { color: var(--muted); font-size: 12.5px; }
+footer a { margin-right: 12px; }
+@media (max-width: 640px) {
+  header, main { padding-left: 12px; padding-right: 12px; }
+  th, td { padding: 6px 8px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>vmate</h1>
+  <span id="state" class="pill warn">loading</span>
+  <span class="sub" id="age"></span>
+  <span class="spacer"></span>
+  <label class="toggle"><input type="checkbox" id="auto" checked> auto-refresh 30s</label>
+  <button id="reload" type="button">Refresh</button>
+</header>
+<main>
+  <div id="banner" class="banner"></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">vmagent pods reachable</div><div class="value" id="k-pods">–</div></div>
+    <div class="kpi"><div class="label">Unhealthy targets</div><div class="value" id="k-unhealthy">–</div></div>
+    <div class="kpi"><div class="label">Jobs affected</div><div class="value" id="k-jobs">–</div></div>
+    <div class="kpi"><div class="label">Last poll took</div><div class="value" id="k-duration">–</div></div>
+  </div>
+
+  <section>
+    <h2>vmagent pods</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Pod</th><th>Reachable</th><th class="num">Up</th><th class="num">Down</th><th class="num">Unknown</th><th>Error</th></tr></thead>
+      <tbody id="pods"><tr><td colspan="6" class="empty">loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section>
+    <h2>Unhealthy targets
+      <span class="tools">
+        <input id="filter" type="search" placeholder="filter job, instance, pod, error" size="32">
+        <select id="groupby">
+          <option value="job">group by job</option>
+          <option value="error">group by error</option>
+          <option value="pod">group by vmagent pod</option>
+        </select>
+      </span>
+    </h2>
+    <div id="targets"><div class="empty">loading…</div></div>
+  </section>
+
+  <footer>
+    API:
+    <a href="unhealthy">/unhealthy</a><a href="summary">/summary</a><a href="status">/status</a><a href="config">/config</a><a href="metrics">/metrics</a><a href="healthz">/healthz</a>
+    · <code>?raw=true</code> on /unhealthy returns the unparsed error
+  </footer>
+</main>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtAge = (s) => s == null ? "never" : s < 90 ? `${Math.round(s)}s ago` : s < 5400 ? `${Math.round(s / 60)}m ago` : `${(s / 3600).toFixed(1)}h ago`;
+  let targets = [];
+  let timer = null;
+
+  function setState(cls, text) { const el = $("state"); el.className = `pill ${cls}`; el.textContent = text; }
+  function banner(cls, text) { const el = $("banner"); el.className = text ? `banner show ${cls}` : "banner"; el.textContent = text || ""; }
+  function kpi(id, value, cls) { const el = $(id); el.textContent = value; el.className = `value ${cls || ""}`; }
+
+  function renderPods(pods) {
+    if (!pods.length) { $("pods").innerHTML = '<tr><td colspan="6" class="empty">no poll completed yet</td></tr>'; return; }
+    $("pods").innerHTML = pods.map((p) => `<tr>
+      <td class="mono">${esc(p.name)}</td>
+      <td>${p.reachable ? '<span class="pill ok">yes</span>' : '<span class="pill bad">no</span>'}</td>
+      <td class="num">${p.reachable ? p.up : "–"}</td>
+      <td class="num">${p.reachable ? p.down : "–"}</td>
+      <td class="num">${p.reachable ? p.unknown : "–"}</td>
+      <td class="mono">${esc(p.error || "")}</td></tr>`).join("");
+  }
+
+  function groupKey(t, by) {
+    if (by === "error") return t.error_code ? `${t.error_code} ${t.error || ""}` : (t.error || "(no error message)");
+    if (by === "pod") return t.pod;
+    return t.job || "(no job)";
+  }
+
+  function renderTargets() {
+    const q = $("filter").value.trim().toLowerCase();
+    const by = $("groupby").value;
+    const rows = q ? targets.filter((t) => [t.job, t.instance, t.pod, t.error, t.error_code, t.target_url].join(" ").toLowerCase().includes(q)) : targets;
+    if (!rows.length) {
+      $("targets").innerHTML = `<div class="empty">${targets.length ? "nothing matches the filter" : "all targets healthy"}</div>`;
+      return;
+    }
+    const open = new Set([...document.querySelectorAll("#targets details[open]")].map((d) => d.dataset.key));
+    const groups = new Map();
+    for (const t of rows) { const k = groupKey(t, by); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
+    const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+    $("targets").innerHTML = sorted.map(([k, list]) => `<details class="group" data-key="${esc(k)}"${open.has(k) || sorted.length === 1 ? " open" : ""}>
+      <summary><span class="name">${esc(k)}</span><span class="count">${list.length}</span></summary>
+      <div class="scroll"><table>
+        <thead><tr><th>Instance</th>${by === "job" ? "" : "<th>Job</th>"}${by === "pod" ? "" : "<th>vmagent pod</th>"}<th>Code</th><th>Error</th><th>Health</th></tr></thead>
+        <tbody>${list.map((t) => `<tr>
+          <td class="mono">${t.target_url ? `<a href="${esc(t.target_url)}" target="_blank" rel="noopener">${esc(t.instance)}</a>` : esc(t.instance)}</td>
+          ${by === "job" ? "" : `<td>${esc(t.job)}</td>`}
+          ${by === "pod" ? "" : `<td class="mono">${esc(t.pod)}</td>`}
+          <td>${t.error_code ? `<span class="code">${esc(t.error_code)}</span>` : ""}</td>
+          <td class="mono">${esc(t.error)}</td>
+          <td>${esc(t.health)}</td></tr>`).join("")}</tbody>
+      </table></div></details>`).join("");
+  }
+
+  async function load() {
+    try {
+      const [sr, ur] = await Promise.all([fetch("status", { cache: "no-store" }), fetch("unhealthy", { cache: "no-store" })]);
+      if (!sr.ok || !ur.ok) throw new Error(`HTTP ${sr.status}/${ur.status}`);
+      const status = await sr.json();
+      const unhealthy = await ur.json();
+      targets = unhealthy.targets || [];
+
+      const total = status.pods.length;
+      const reachable = status.pods.filter((p) => p.reachable).length;
+      const stale = status.age_seconds == null || status.age_seconds > 3 * status.poll_interval;
+      const jobs = new Set(targets.map((t) => t.job)).size;
+
+      kpi("k-pods", total ? `${reachable}/${total}` : "–", !total ? "warn" : reachable === total ? "ok" : reachable === 0 ? "bad" : "warn");
+      kpi("k-unhealthy", targets.length, targets.length ? "bad" : "ok");
+      kpi("k-jobs", jobs, jobs ? "bad" : "ok");
+      kpi("k-duration", status.poll_duration == null ? "–" : `${status.poll_duration}s`);
+      $("age").textContent = `last poll ${fmtAge(status.age_seconds)} · interval ${status.poll_interval}s`;
+
+      if (stale) {
+        setState("warn", "stale");
+        banner("warn", status.last_poll ? `Data is ${fmtAge(status.age_seconds)} old (poll interval ${status.poll_interval}s). The poll loop may be stuck, check the vmate logs.` : "No poll cycle completed yet.");
+      } else if (total && reachable < total) {
+        setState(reachable ? "warn" : "bad", reachable ? "degraded" : "vmagents down");
+        banner(reachable ? "warn" : "bad", `${total - reachable} of ${total} vmagent pods did not answer the last poll. Their targets are missing below.`);
+      } else {
+        setState(targets.length ? "warn" : "ok", targets.length ? "targets down" : "ok");
+        banner("", "");
+      }
+      renderPods(status.pods);
+      renderTargets();
+    } catch (e) {
+      setState("bad", "vmate unreachable");
+      banner("bad", `Cannot load data from vmate (${e.message}). Values below are from the last successful load.`);
+    }
+  }
+
+  function schedule() { clearInterval(timer); if ($("auto").checked) timer = setInterval(load, 30000); }
+  $("reload").addEventListener("click", load);
+  $("auto").addEventListener("change", schedule);
+  $("filter").addEventListener("input", renderTargets);
+  $("groupby").addEventListener("change", renderTargets);
+  load();
+  schedule();
+})();
+</script>
+</body>
+</html>

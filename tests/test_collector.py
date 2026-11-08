@@ -164,3 +164,28 @@ async def test_recovered_target_is_removed_not_zeroed(monkeypatch):
     await collector.collect_all()
 
     assert key not in metric_samples(unhealthy_target_info)
+
+
+async def test_poll_status_records_reachability_per_pod(monkeypatch):
+    pod_a, pod_b = make_pod("vmagent-0"), make_pod("vmagent-1")
+    monkeypatch.setattr(collector, "discover_pods", lambda: [pod_a, pod_b])
+
+    async def poll_pod(client, pod):
+        if pod.name == "vmagent-1":
+            raise httpx.ConnectError("connection refused")
+        for t in [target("job-x", "10.0.0.1:9100", "up"), target("job-x", "10.0.0.2:9100", "down")]:
+            yield t
+
+    monkeypatch.setattr(collector, "poll_pod", poll_pod)
+
+    await collector.collect_all()
+
+    assert collector.poll_status["last_poll"] is not None
+    assert collector.poll_status["pods"]["vmagent-0"] == {
+        "reachable": True,
+        "error": None,
+        "up": 1,
+        "down": 1,
+        "unknown": 0,
+    }
+    assert collector.poll_status["pods"]["vmagent-1"] == {"reachable": False, "error": "connection refused"}
