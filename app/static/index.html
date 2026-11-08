@@ -62,6 +62,8 @@ tr:last-child td { border-bottom: none; }
 .group > summary::before { content: "▸"; color: var(--muted); width: 1em; }
 .group[open] > summary::before { content: "▾"; }
 .group > summary .name { font-weight: 600; word-break: break-all; }
+a.api { font-family: var(--mono); font-size: 11.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; white-space: nowrap; }
+a.api:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
 .group > summary .count { margin-left: auto; color: var(--bad); font-weight: 650; font-variant-numeric: tabular-nums; }
 .group table { background: var(--bg); }
 .empty { padding: 18px 14px; color: var(--muted); }
@@ -98,8 +100,8 @@ footer a { margin-right: 12px; }
   <section>
     <h2>vmagent pods</h2>
     <div class="scroll"><table>
-      <thead><tr><th>Pod</th><th>Reachable</th><th class="num">Up</th><th class="num">Down</th><th class="num">Unknown</th><th>Error</th></tr></thead>
-      <tbody id="pods"><tr><td colspan="6" class="empty">loading…</td></tr></tbody>
+      <thead><tr><th>Pod</th><th>Reachable</th><th class="num">Up</th><th class="num">Down</th><th class="num">Unknown</th><th>Error</th><th>API</th></tr></thead>
+      <tbody id="pods"><tr><td colspan="7" class="empty">loading…</td></tr></tbody>
     </table></div>
   </section>
 
@@ -137,14 +139,21 @@ footer a { margin-right: 12px; }
   function kpi(id, value, cls) { const el = $(id); el.textContent = value; el.className = `value ${cls || ""}`; }
 
   function renderPods(pods) {
-    if (!pods.length) { $("pods").innerHTML = '<tr><td colspan="6" class="empty">no poll completed yet</td></tr>'; return; }
+    if (!pods.length) { $("pods").innerHTML = '<tr><td colspan="7" class="empty">no poll completed yet</td></tr>'; return; }
     $("pods").innerHTML = pods.map((p) => `<tr>
       <td class="mono">${esc(p.name)}</td>
       <td>${p.reachable ? '<span class="pill ok">yes</span>' : '<span class="pill bad">no</span>'}</td>
       <td class="num">${p.reachable ? p.up : "–"}</td>
       <td class="num">${p.reachable ? p.down : "–"}</td>
       <td class="num">${p.reachable ? p.unknown : "–"}</td>
-      <td class="mono">${esc(p.error || "")}</td></tr>`).join("");
+      <td class="mono">${esc(p.error || "")}</td>
+      <td>${apiLink("pod", p.name)}</td></tr>`).join("");
+  }
+
+  function apiLink(kind, name) {
+    if (!name) return "";
+    const href = `${kind}/${encodeURIComponent(name)}/unhealthy`;
+    return `<a class="api" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(href)}" onclick="event.stopPropagation()">JSON</a>`;
   }
 
   function groupKey(t, by) {
@@ -166,7 +175,7 @@ footer a { margin-right: 12px; }
     for (const t of rows) { const k = groupKey(t, by); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); }
     const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
     $("targets").innerHTML = sorted.map(([k, list]) => `<details class="group" data-key="${esc(k)}"${open.has(k) || sorted.length === 1 ? " open" : ""}>
-      <summary><span class="name">${esc(k)}</span><span class="count">${list.length}</span></summary>
+      <summary><span class="name">${esc(k)}</span>${by === "error" ? "" : apiLink(by, by === "job" ? list[0].job : list[0].pod)}<span class="count">${list.length}</span></summary>
       <div class="scroll"><table>
         <thead><tr><th>Instance</th>${by === "job" ? "" : "<th>Job</th>"}${by === "pod" ? "" : "<th>vmagent pod</th>"}<th>Code</th><th>Error</th><th>Health</th></tr></thead>
         <tbody>${list.map((t) => `<tr>
