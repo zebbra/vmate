@@ -1,0 +1,13 @@
+apiVersion: v2
+name: vmate
+description: VictoriaMetrics Agent Target Exporter - live scrape target health across all vmagent pods
+type: application
+version: 0.1.0
+appVersion: "94c9e22"
+home: https://github.com/zebbra/vmate
+sources:
+  - https://github.com/zebbra/vmate
+keywords:
+  - victoriametrics
+  - vmagent
+  - monitoring

@@ -81,6 +81,18 @@ Every push to `main` publishes `quay.io/zebbra/vmate:<short-sha>` and `:latest`.
 | `vmate_job_targets_total` | `job`, `state` | Fleet-wide target counts per job and state |
 | `vmate_unhealthy_target_info` | `pod`, `scrape_pool`, `job`, `instance` | 1 per unhealthy target, 0 on recovery |
 
+## Install (Helm)
+
+The chart lives in [`charts/vmate`](charts/vmate). From a checkout:
+
+```sh
+helm install vmate charts/vmate -n monitoring \
+  --set vmagent.labelSelector=app.kubernetes.io/instance=victoria-metrics-agent \
+  --set dashboard.enabled=true
+```
+
+`vmagent.namespace` defaults to the release namespace; the chart creates a Role there to list pods. `dashboard.enabled` adds a ConfigMap with [`dashboards/vmate.json`](dashboards/vmate.json), labelled `grafana_dashboard: "1"` for the Grafana sidecar. The image tag defaults to the chart `appVersion`.
+
 ## Configuration
 
 All options are set via environment variables with the `VMTE_` prefix.

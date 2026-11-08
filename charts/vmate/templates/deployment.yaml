@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vmate.fullname" . }}
+  labels:
+    {{- include "vmate.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "vmate.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "vmate.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "vmate.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: vmate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: VMTE_NAMESPACE
+              value: {{ include "vmate.targetNamespace" . | quote }}
+            - name: VMTE_LABEL_SELECTOR
+              value: {{ .Values.vmagent.labelSelector | quote }}
+            - name: VMTE_VMAGENT_PORT
+              value: {{ .Values.vmagent.port | quote }}
+            - name: VMTE_VMAGENT_TIMEOUT
+              value: {{ .Values.vmagent.timeout | quote }}
+            - name: VMTE_POLL_INTERVAL
+              value: {{ .Values.pollInterval | quote }}
+            - name: VMTE_LOG_LEVEL
+              value: {{ .Values.logLevel | quote }}
+            - name: VMTE_IGNORE_INFO_JOBS
+              value: {{ join "," .Values.ignoreInfoJobs | quote }}
+            - name: VMTE_IGNORE_HEALTH_JOBS
+              value: {{ join "," .Values.ignoreHealthJobs | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

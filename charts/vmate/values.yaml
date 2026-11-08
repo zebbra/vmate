@@ -1,0 +1,82 @@
+image:
+  repository: quay.io/zebbra/vmate
+  # defaults to the chart appVersion
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+vmagent:
+  # namespace the vmagent pods run in, defaults to the release namespace
+  namespace: ""
+  labelSelector: "app.kubernetes.io/instance=victoria-metrics-agent"
+  port: 8429
+  timeout: 10
+
+# seconds between poll cycles, prime to avoid phase-lock with scrape intervals
+pollInterval: 113
+logLevel: INFO
+# jobs excluded from vmate_unhealthy_target_info and the /unhealthy endpoints
+ignoreInfoJobs: []
+# jobs excluded from all target count metrics
+ignoreHealthJobs: []
+
+extraEnv: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  # Role + RoleBinding to list pods in vmagent.namespace
+  create: true
+
+replicaCount: 1
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  #  - host: vmate.example.com
+  tls: []
+
+dashboard:
+  # ConfigMap with the Grafana dashboard (dashboards/vmate.json)
+  enabled: false
+  # label picked up by the Grafana dashboard sidecar
+  labels:
+    grafana_dashboard: "1"
+  annotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
