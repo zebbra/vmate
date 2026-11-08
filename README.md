@@ -50,6 +50,7 @@ vmate solves this by acting as a proxy and summarizer for vmagent's `/api/v1/tar
 
 It reads vmate's own endpoints, so it keeps working when Grafana, vmselect or the scrape pipeline are down: a break-glass view of what vmagent actually sees right now.
 
+<img width="1460" height="859" alt="image" src="https://github.com/user-attachments/assets/5ca9bff3-14ce-4da2-915b-7fcfd84c6528" />
 
 ## Endpoints
 
