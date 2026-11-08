@@ -136,6 +136,18 @@ vmate exposes data through two complementary interfaces, both suitable for Commo
 - **Prometheus / VictoriaMetrics datasource** — scrape `/metrics` to get all vmate metrics into your TSDB, then query them in Grafana dashboards and alerts the usual way.
 - **Infinity plugin (JSON)** — query the `/unhealthy`, `/summary`, or `/pod/{pod}/unhealthy` endpoints directly from Grafana using the [Infinity datasource](https://grafana.com/grafana/plugins/yesoreyeram-infinity-datasource/). Useful for ad-hoc exploration or dashboards that show raw target error details without a separate scrape pipeline.
 
+### Dashboard
+
+[`dashboard.json`](dashboard.json) is a Grafana v2 dashboard resource (uid `vmate`). Its variables keep it environment independent:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `datasource` | `platform` | Prometheus/VictoriaMetrics datasource that scrapes vmate and vmagent |
+| `infinity` | `infinity` | Infinity datasource for the live table |
+| `vmate_url` | `http://vmate:8080` | vmate service as seen from Grafana |
+
+The process panels select `job=~".*vmate.*"`. This file is the source of truth; deployments copy it, never the other way round.
+
 ## Monitoring Loop: vmagent as scraper and target
 
 vmate polls vmagent's `/api/v1/targets` to detect unhealthy scrape targets — but vmagent is also the component that scrapes vmate's own `/metrics`. If vmagent goes down, both sides of this loop fail simultaneously: vmate loses visibility into the vmagent pods, and vmagent can no longer deliver vmate's metrics to the TSDB. The failure becomes invisible.
